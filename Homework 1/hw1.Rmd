@@ -1,0 +1,123 @@
+---
+title:  Homework 1
+author: "[Jacob Carey](mailto:jcarey15@jhu.edu)"
+date:   "`r Sys.Date()`"
+output: pdf_document
+---
+
+**Libraries**
+```{r libraries}
+knitr::opts_chunk$set(cache=TRUE)
+# library(MASS)
+library(mvtnorm)
+library(ggplot2)
+```
+
+**Problem 1**  
+**a)**
+```{r p1a}
+a.0 <- -17.31
+b.0 <- 2.57
+Sigma.0 <- matrix(c(1053.72, -156.45, -156.45, 23.24), nrow=2)
+
+prior.samples <- rmvnorm(1e3, c(a.0, b.0), Sigma.0)
+
+ggplot(data.frame(prior.samples), aes(x=X1, y=X2)) +
+   geom_jitter() +
+   xlab(expression(alpha)) +
+   ylab(expression(beta))
+```
+
+**b)**
+```{r p1b}
+x <- c(-0.86, -0.30, -0.05, 0.73) + log(1e3)
+n <- rep(5, 4)
+y <- c(0, 1, 3, 5)
+
+lik <- function(grid, x, y, n) {
+    a <- grid[1]
+    b <- grid[2]
+    p <- pnorm(a + b * x)
+    log.lik <- sum(y * log(p) + (n - y) * log(1 - p))
+    return(exp(log.lik))
+}
+
+a.grid <- seq(-80, -5, 0.1)
+b.grid <- seq(0, 11, 0.1)
+grid <- expand.grid(a.grid, b.grid)
+
+z <- matrix(apply(grid, 1, lik, x=x, y=y, n=n),
+            nrow=length(a.grid), ncol=length(b.grid),
+            byrow=FALSE)
+
+contour(a.grid, b.grid, z, 
+        xlab=expression(alpha), 
+        ylab=expression(beta), drawlabels=FALSE,
+        main="Likelihood Plot")
+```
+
+The likelihood has a similar shape to the prior, however, it
+appears to be more concentrated than the prior.
+
+**c)**
+```{r p1c}
+gen.lik <- function(grid, x, y, n) {
+    lik <- lik(grid, x, y, n)
+    prior.prob <- dmvnorm(grid, c(a.0, b.0), Sigma.0)
+    return(lik * prior.prob)
+}
+
+z <- matrix(apply(grid, 1, gen.lik, x=x, y=y, n=n),
+            nrow=length(a.grid), ncol=length(b.grid),
+            byrow=FALSE)
+
+contour(a.grid, b.grid, z, 
+        xlab=expression(alpha), 
+        ylab=expression(beta), drawlabels=FALSE,
+        main="Generalized Likelihood Plot")
+```
+
+**d)**
+```{r p1d}
+GenRandomFromGrid <- function(x, cdf.x) {
+    u <- runif(1)
+    max(x[u > cdf.x])
+}
+
+p.ab <- z/sum(z, na.rm=TRUE)
+p.a <- apply(p.ab, 1, sum, na.rm=TRUE)
+p.b <- apply(p.ab, 2, sum, na.rm=TRUE)
+
+cdf.a <- cumsum(p.a)
+cdf.b <- cumsum(p.b)
+
+u <- runif(1e3)
+
+a <- rep(NA, length(u))
+b <- rep(NA, length(u))
+
+for (i in 1:length(u)) {
+    a[i] <- max(a.grid[u[i] > cdf.a])
+}
+
+for (i in 1:length(a)) {
+    j <- which(a.grid == a[i])
+    cdf.b.given.a <- cumsum(na.omit(p.ab[j, ])) / sum(p.ab[j, ], na.rm=TRUE)
+    b[i] <- max(b.grid[u[i] > cdf.b.given.a])
+}
+
+plot(a, b, xlab=expression(alpha), ylab=expression(beta))
+```
+
+**e)**
+```{r p1e}
+qplot(a, main=expression(alpha), binwidth=3)
+qplot(b, main=expression(beta), binwidth=0.1)
+```
+
+**f)**
+```{r p1f}
+log.ld.50 <- -a / b
+
+qplot(log.ld.50, xlab=expression("Log LD"[50]), ylab="Density", binwidth=0.3)
+```
