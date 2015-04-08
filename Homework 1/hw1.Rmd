@@ -158,3 +158,7 @@ posterior density of the $\text{LD}_{50}$.
 ld.50 <- -log.ld.50 / exp(log.ld.50)
 qplot(ld.50, xlab=expression("LD"[50]), ylab="Density")
 ```
+
+The posterior mean is `r mean(ld.50)`, median: `r median(ld.50)`,
+standard deviation `r sd(ld.50)`, 90% credible interval
+`r quantile(ld.50, c(0.05, 0.95))`
