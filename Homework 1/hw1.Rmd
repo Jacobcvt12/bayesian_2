@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo=FALSE)
 # library(MASS)
 library(mvtnorm)
 library(ggplot2)
+set.seed(1)
 ```
 
 **Problem 1**  
@@ -125,7 +126,8 @@ for (i in 1:length(u)) {
 
 for (i in 1:length(a)) {
     j <- which(a.grid == a[i])
-    cdf.b.given.a <- cumsum(na.omit(p.ab[j, ])) / sum(p.ab[j, ], na.rm=TRUE)
+    cdf.b.given.a <- cumsum(na.omit(p.ab[j, ])) / 
+        sum(p.ab[j, ], na.rm=TRUE)
     b[i] <- max(b.grid[u[i] > cdf.b.given.a])
 }
 
@@ -144,7 +146,7 @@ We use our samples from the joint posterior
 distribution to calculate the posterior density of the
 log dose that is lethal to 50% of the animal.  
 ```{r p1f}
-log.ld.50 <- -a / b
+log.ld.50 <- sort(-a / b)
 
 qplot(log.ld.50, xlab=expression("Log LD"[50]), 
       ylab="Density", binwidth=0.3)
@@ -153,9 +155,17 @@ qplot(log.ld.50, xlab=expression("Log LD"[50]),
 **g)**
 Since the logarithm is a continuous and increasing function with inverse
 $\exp$, we use the change of variable technique to obtain the 
-posterior density of the $\text{LD}_{50}$.  
+posterior density of the $\text{LD}_{50}$. We do this by computing
+the CDF of the log LD50 (cumsum(log ld50)/sum(log ld 50)). This is
+related to the CDF of the LD50 by taking antilog of the concentrations
+estimated in log ld50 scale.
 ```{r p1g}
-ld.50 <- -log.ld.50 / exp(log.ld.50)
+# P(log ld_50 < log(x))
+cdf <- cumsum(log.ld.50) / sum(log.ld.50)
+ld.50 <- exp(log.ld.50)
+qplot(ld.50, cdf)
+# qplot(log.ld.50, log.ld.50.cdf)
+ld.50 <- log.ld.50 / abs(exp(log.ld.50))
 qplot(ld.50, xlab=expression("LD"[50]), ylab="Density")
 ```
 
