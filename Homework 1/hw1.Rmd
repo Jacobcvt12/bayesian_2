@@ -153,19 +153,11 @@ qplot(log.ld.50, xlab=expression("Log LD"[50]),
 ```
 
 **g)**
-Since the logarithm is a continuous and increasing function with inverse
-$\exp$, we use the change of variable technique to obtain the 
-posterior density of the $\text{LD}_{50}$. We do this by computing
-the CDF of the log LD50 (cumsum(log ld50)/sum(log ld 50)). This is
-related to the CDF of the LD50 by taking antilog of the concentrations
-estimated in log ld50 scale.
+In order to calculate the LD50, we simply exponentiate our simulations
+of $-\frac{\alpha}{\beta}$.  
+
 ```{r p1g}
-# P(log ld_50 < log(x))
-cdf <- cumsum(log.ld.50) / sum(log.ld.50)
 ld.50 <- exp(log.ld.50)
-qplot(ld.50, cdf)
-# qplot(log.ld.50, log.ld.50.cdf)
-ld.50 <- log.ld.50 / abs(exp(log.ld.50))
 qplot(ld.50, xlab=expression("LD"[50]), ylab="Density")
 ```
 
