@@ -8,6 +8,7 @@ output: pdf_document
 **Libraries**
 ```{r libraries}
 knitr::opts_chunk$set(cache=TRUE)
+knitr::opts_chunk$set(echo=FALSE)
 # library(MASS)
 library(mvtnorm)
 library(ggplot2)
@@ -15,6 +16,8 @@ library(ggplot2)
 
 **Problem 1**  
 **a)**
+We sample from a multivariate normal with given prior parameters.
+The samples are "jittered" for inspection.  
 ```{r p1a}
 a.0 <- -17.31
 b.0 <- 2.57
@@ -29,6 +32,13 @@ ggplot(data.frame(prior.samples), aes(x=X1, y=X2)) +
 ```
 
 **b)**
+We transform the log dose to log mg/ml before the following problems.  
+We create a grid of $\alpha$ from -80 to -5 and $\beta$ from 0 to 11.
+Each $\alpha$, $\beta$ combination from the grid is used to calculate a
+probability of death via the standard normal CDF of 
+$\alpha + \beta \times x_i$ for each $i = 1, ..., 5$. The log likelihood
+is computed as the sum of $y_i \times \log(p_i) + (5 - y_i) \times \log(1 - p_i)$.  
+
 ```{r p1b}
 x <- c(-0.86, -0.30, -0.05, 0.73) + log(1e3)
 n <- rep(5, 4)
@@ -50,6 +60,8 @@ z <- matrix(apply(grid, 1, lik, x=x, y=y, n=n),
             nrow=length(a.grid), ncol=length(b.grid),
             byrow=FALSE)
 
+z[is.na(z)] <- 0
+
 contour(a.grid, b.grid, z, 
         xlab=expression(alpha), 
         ylab=expression(beta), drawlabels=FALSE,
@@ -60,6 +72,11 @@ The likelihood has a similar shape to the prior, however, it
 appears to be more concentrated than the prior.
 
 **c)**
+Using the same grid from problem 1b, we calculate the PDF of the
+multivariate normal for each combination. This PDF is multiplied
+with the likelihood calculated in 1b to obtain the generalized
+likelihood.  
+
 ```{r p1c}
 gen.lik <- function(grid, x, y, n) {
     lik <- lik(grid, x, y, n)
@@ -78,6 +95,12 @@ contour(a.grid, b.grid, z,
 ```
 
 **d)**
+We calculate the joint posterior density using the
+by normalizing the generalized likelihood from 1c.
+The marginal probabilities are calculated by 
+summing over $\alpha$ and $\beta$ for $\beta$
+and $\alpha$ respectively. We sample from the
+joint distribution as described in lecture 2.  
 ```{r p1d}
 GenRandomFromGrid <- function(x, cdf.x) {
     u <- runif(1)
@@ -110,14 +133,23 @@ plot(a, b, xlab=expression(alpha), ylab=expression(beta))
 ```
 
 **e)**
+We use the marginal posteriors calculated in 1d.  
 ```{r p1e}
-qplot(a, main=expression(alpha), binwidth=3)
-qplot(b, main=expression(beta), binwidth=0.1)
+qplot(a, xlab=expression(alpha), binwidth=3)
+qplot(b, xlab=expression(beta), binwidth=0.1)
 ```
 
 **f)**
+We use our samples from the joint posterior
+distribution to calculate the posterior density of the
+log dose that is lethal to 50% of the animal.
 ```{r p1f}
 log.ld.50 <- -a / b
 
-qplot(log.ld.50, xlab=expression("Log LD"[50]), ylab="Density", binwidth=0.3)
+qplot(log.ld.50, xlab=expression("Log LD"[50]), 
+      ylab="Density", binwidth=0.3)
 ```
+
+**g)**
+Since the logarithm is a continuous and increasing function with inverse
+$\exp$, we use the change of variable technique to obtain the posterior density 
