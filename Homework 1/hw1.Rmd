@@ -142,7 +142,7 @@ qplot(b, xlab=expression(beta), binwidth=0.1)
 **f)**
 We use our samples from the joint posterior
 distribution to calculate the posterior density of the
-log dose that is lethal to 50% of the animal.
+log dose that is lethal to 50% of the animal.  
 ```{r p1f}
 log.ld.50 <- -a / b
 
@@ -152,4 +152,9 @@ qplot(log.ld.50, xlab=expression("Log LD"[50]),
 
 **g)**
 Since the logarithm is a continuous and increasing function with inverse
-$\exp$, we use the change of variable technique to obtain the posterior density 
+$\exp$, we use the change of variable technique to obtain the 
+posterior density of the $\text{LD}_{50}$.  
+```{r p1g}
+ld.50 <- -log.ld.50 / exp(log.ld.50)
+qplot(ld.50, xlab=expression("LD"[50]), ylab="Density")
+```
