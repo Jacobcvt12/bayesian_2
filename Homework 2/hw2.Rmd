@@ -1,0 +1,20 @@
+---
+title:  Homework 2
+author: "[Jacob Carey](mailto:jcarey15@jhu.edu)"
+date:   "`r Sys.Date()`"
+output: pdf_document
+---
+
+**Libraries**
+```{r libraries}
+knitr::opts_chunk$set(cache=TRUE)
+knitr::opts_chunk$set(echo=FALSE)
+library(mvtnorm)
+library(ggplot2)
+set.seed(90210)
+```
+
+**Problem 1**  
+```{r data}
+x <- c(102.4)
+```
