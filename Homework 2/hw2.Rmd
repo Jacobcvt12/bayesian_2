@@ -5,10 +5,10 @@ date:   "`r Sys.Date()`"
 output: pdf_document
 ---
 
-**Libraries**
-```{r libraries}
+```{r libraries, echo=FALSE}
 knitr::opts_chunk$set(cache=TRUE)
 knitr::opts_chunk$set(echo=FALSE)
+knitr::opts_chunk$set(warning=FALSE)
 library(mvtnorm)
 library(ggplot2)
 set.seed(90210)
@@ -16,5 +16,114 @@ set.seed(90210)
 
 **Problem 1**  
 ```{r data}
-x <- c(102.4)
+x <- c(102.4, 103.2, 101.9, 103.0, 101.2, 100.7, 
+       102.5, 103.1, 102.8, 102.3, 101.9, 101.4)
+
+y <- c(99.6, 100.1, 100.2, 101.1, 99.8, 100.2, 
+       101.0, 100.1, 100.7, 101.1, 101.3, 100.2)
+
+z <- y - x
+```
+
+**a)**
+
+```{r p1a}
+qplot(x-mean(x), z, geom="point", 
+      main="Temperature Before and After Aspirin")
+```
+
+There appears to be a roughly linear association between the
+(centered) baseline temperature and the decrease in temperature.
+
+**b)**
+In class, we showed that $\sigma^2 | y \sim 
+\text{Inv-Gamma}((n-k)/2, s^2/2)$  
+where $s^2=\frac{1}{n-k}(y - X \hat{\beta})'(y-X\hat{\beta})$.
+We have that $p(\beta|y) = \int p(\beta|\sigma^2, y)
+p(\sigma^2|y)d\sigma^2$. Instead of finding an analytical solution
+for the marginal posterior of $\beta$, we use simulations to 
+characterize the density. We use the following conditional posterior
+for sampling
+$\beta | y, \sigma^2 \sim N(\hat{\beta}, V_{\beta}\sigma^2$).
+```{r p1b}
+# http://www.biostat.umn.edu/~brad/7440/Lecture5.pdf
+X <- matrix(c(rep(1, 12), x - mean(x)), ncol=2)
+y <- z
+
+beta.hat <- solve(t(X) %*% X) %*% t(X) %*% y
+V.beta <- solve(t(X) %*% X)
+
+n <- nrow(X)
+k <- ncol(X)
+
+s.2 <- 1 / (n - k) * t(y - X %*% beta.hat) %*% (y - X %*% beta.hat)
+
+S <- 5e3
+PHI <- matrix(0, nrow=S, ncol=3)
+
+for (s in 1:S) {
+    prec.s <- rgamma(1, (n - k) / 2, s.2 / 2)
+    beta.s <- rmvnorm(1, beta.hat, V.beta / prec.s)
+
+    PHI[s, ] <- c(prec.s, beta.s)
+}
+
+qplot(PHI[, 2], xlab=expression(beta[0]), main="Posterior")
+qplot(PHI[, 3], xlab=expression(beta[1]), main="Posterior")
+```
+
+**c)**
+By assumption of the linear model, $Z_{13} \sim 
+N(x_{13} \beta, \sigma^2 I)$. We can write the predictive
+density for the child as 
+$p(Z_{13}|Z_1, ..., Z_{12}) = \int p(Z_{13} | \beta, \sigma^2)
+p(\beta, \sigma^2 | Z_1, ..., Z_{12}) d\beta d\sigma^2$. We adjust
+the baseline temperature of the child by subtracting the mean of the
+baseline temperature training data from the baseline. We sample from
+the predictive distribution to find the predictive density.
+
+```{r p1c}
+PHI <- numeric(S)
+x.tilde <- c(1, 100 - mean(x))
+
+for (s in 1:S) {
+    prec.s <- rgamma(1, (n - k) / 2, s.2 / 2)
+    beta.s <- rmvnorm(1, beta.hat, V.beta / prec.s)
+    y.tilde <- rnorm(1, x.tilde %*% t(beta.s), 1 / prec.s)
+
+    PHI[s] <- y.tilde
+}
+
+qplot(PHI, xlab=expression("Z"[13]), main="Predictive Density")
+```
+
+To solve for $\text{Pr}(Z_{13}<0|z_1,x_1, ..., z_{12},x_{12}, x_{13})$,
+we count the proportion of samples less than 0. We find that this 
+proportion (or the probability of being less than 0) is 
+`r mean(PHI < 0)`.
+
+**d)**
+```{r p1d-sample}
+b.0 <- c(0, 0)
+Sigma.0 <- diag(c(10, 2))
+v.0 <- 0.01
+sigma.0.2 <- 1
+
+g <- n
+m <- g / (g + 1) * solve(t(X) %*% X) %*% t(X) %*% y
+V <- g / (g + 1) * sigma.0.2 * solve(t(X) %*% X)
+SSR <- t(y) %*% (diag(n) - g / (g + 1) * X %*%
+                 solve(t(X) %*% X) %*% t(X))  %*% y
+SSR <- as.numeric(SSR)
+
+S <- 5e3
+PHI <- matrix(0, nrow=S, ncol=3)
+
+for (s in 1:S) {
+    precision <- rgamma(1, (v.0 + n) / 2, (v.0 + SSR) / 2)
+    V <- g / (g + 1) * 1 / precision * solve(t(X) %*% X)
+    beta <- rmvnorm(1, m, V)
+
+    PHI[s, ] <- c(precision, beta[1, ])
+}
 ```
