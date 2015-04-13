@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo=FALSE)
 knitr::opts_chunk$set(warning=FALSE)
 library(mvtnorm)
 library(ggplot2)
+source("FEV.data")
 set.seed(90210)
 ```
 
@@ -103,27 +104,132 @@ proportion (or the probability of being less than 0) is
 `r mean(PHI < 0)`.
 
 **d)**
+Write the R code to fit the regression with g-prior and compute the Bayes factor in favor of an association with baseline temperature. (You can take g = n = 12.) Does your inference about the association between the baseline temperature and the effect of aspirin change?
 ```{r p1d-sample}
 b.0 <- c(0, 0)
 Sigma.0 <- diag(c(10, 2))
-v.0 <- 0.01
+nu.0 <- 0.01
 sigma.0.2 <- 1
 
 g <- n
-m <- g / (g + 1) * solve(t(X) %*% X) %*% t(X) %*% y
-V <- g / (g + 1) * sigma.0.2 * solve(t(X) %*% X)
-SSR <- t(y) %*% (diag(n) - g / (g + 1) * X %*%
-                 solve(t(X) %*% X) %*% t(X))  %*% y
-SSR <- as.numeric(SSR)
-
+H.g <- g / (g + 1) * X %*% solve(t(X) %*% X) %*% t(X)
+SSR.g <- t(y) %*% (diag(g) - H.g) %*% y
 S <- 5e3
-PHI <- matrix(0, nrow=S, ncol=3)
+
+sigma.2 <- 1 / rgamma(S, (nu.0 + n) / 2,
+                      (nu.0 * sigma.0.2 + SSR.g) / 2)
+beta <- matrix(0, nrow=S, ncol=2)
+m <- g / (g + 1) * beta.hat
+
 
 for (s in 1:S) {
-    precision <- rgamma(1, (v.0 + n) / 2, (v.0 + SSR) / 2)
-    V <- g / (g + 1) * 1 / precision * solve(t(X) %*% X)
-    beta <- rmvnorm(1, m, V)
-
-    PHI[s, ] <- c(precision, beta[1, ])
+    V <- g / (g + 1) * sigma.2[s] * solve(t(X) %*% X)
+    beta[s, ] <- rmvnorm(1, m, V)
 }
 ```
+```{r p1d-bf}
+```
+
+**2**
+Fit the regression model with interaction term to the FEV data. I prefer you use R directly and not jags.
+
+**a)**
+Using the posterior samples, estimate the posterior probability that the interaction term is positive and the posterior probability the interaction term is negative.
+```{r p2a}
+## NAIVE MODEL
+
+# prior parameters
+b.0 <- c(3, 0, 0)
+Sigma.0 <- diag(5, 3)
+nu.0 <- 1
+sigma.0.2 <- 1
+n <- length(fev)
+
+# organize data
+# X <- matrix(c(rep(1, length(age)), smoker, age, smoker * age), ncol=4)
+X <- matrix(c(rep(1, length(age)), smoker, age), ncol=3)
+y <- fev
+
+# Gibbs sampler
+S <- 5e3
+beta.post <- matrix(0, nrow=S, ncol=3)
+sigma.2.post <- numeric(S)
+
+# first guess for sigma.2
+sigma.2 <- 1 / rgamma(1, nu.0 / 2, nu.0 * sigma.0.2 / 2)
+
+for (s in 1:S) {
+    # update beta
+    V.b <- solve(solve(Sigma.0) + t(X) %*% X / sigma.2)
+    E.b <- V.b %*% (solve(Sigma.0) %*% b.0 + t(X) %*% y / sigma.2)
+    beta <- t(rmvnorm(1, E.b, V.b))
+
+    # update sigma.2
+    nu.n <- nu.0 + n
+    SSR <- sum((y - X %*% beta) ^ 2)
+    ss.n <- nu.0 * sigma.0.2 + SSR
+    sigma.2 <- 1 / rgamma(1, nu.n / 2, ss.n / 2)
+
+    # save results
+    beta.post[s, ] <- beta
+    sigma.2.post[s] <- sigma.2
+}
+
+naive.model <- list(beta=beta.post, sigma.2=sigma.2.post)
+
+## INTERACTION MODEL
+
+# prior parameters
+b.0 <- c(3, 0, 0, 0)
+Sigma.0 <- diag(5, 4)
+nu.0 <- 1
+sigma.0.2 <- 1
+n <- length(fev)
+
+# organize data
+# X <- matrix(c(rep(1, length(age)), smoker, age, smoker * age), ncol=4)
+X <- matrix(c(rep(1, length(age)), smoker, age, smoker * age), ncol=4)
+y <- fev
+
+# Gibbs sampler
+S <- 5e3
+beta.post <- matrix(0, nrow=S, ncol=4)
+sigma.2.post <- numeric(S)
+
+# first guess for sigma.2
+sigma.2 <- 1 / rgamma(1, nu.0 / 2, nu.0 * sigma.0.2 / 2)
+
+for (s in 1:S) {
+    # update beta
+    V.b <- solve(solve(Sigma.0) + t(X) %*% X / sigma.2)
+    E.b <- V.b %*% (solve(Sigma.0) %*% b.0 + t(X) %*% y / sigma.2)
+    beta <- t(rmvnorm(1, E.b, V.b))
+
+    # update sigma.2
+    nu.n <- nu.0 + n
+    SSR <- sum((y - X %*% beta) ^ 2)
+    ss.n <- nu.0 * sigma.0.2 + SSR
+    sigma.2 <- 1 / rgamma(1, nu.n / 2, ss.n / 2)
+
+    # save results
+    beta.post[s, ] <- beta
+    sigma.2.post[s] <- sigma.2
+}
+
+interaction.model <- list(beta=beta.post, sigma.2=sigma.2.post)
+```
+
+The posterior probability that the interaction term is negative is
+`r mean(interaction.model$beta[, 4] < 0)` and that it is postive is
+`r round(mean(interaction.model$beta[, 4] > 0), 2)`.
+
+**b)**
+Based on these posterior probability estimates for the interaction term, what is your conclusion about the evidence for an interaction?
+
+Based on the estimates from the posterior distribution, I conclude that 
+there exists an interaction between smoking and age, and that this
+interaction is negative. In other words, we expect for the gain in
+FEV to be less by age for smokers.
+
+**c)**
+Slide 24 of the Lecture05 file gives the analytic formula for the Bayes factor in nested normal regression models. Compute the Bayes factor that compares the model with interaction to the model with just the main effects but without the interaction. What is the evidence in favor of the interaction based on the Bayes factor?
