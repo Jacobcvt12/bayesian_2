@@ -129,33 +129,60 @@ for (s in 1:S) {
 ```
 ```{r p1d-bf}
 # how much the data favor model z.a over z.b
-p.z.a <- 1
-p.z.b <- 2
 
-X.a <- X[, 1]
+# design matrices
+X.a <- as.matrix(X[, 1])
 X.b <- X
 
-# s.2.n is the estimated residual variance under the least squares estimate
-# for model n
+# degrees of freedom
+p.z.a <- ncol(X.a)
+p.z.b <- ncol(X.b)
 
-s.2.a <- 
-bayes.factor <- (1 + n) ^ (
-# review slides!
+# beta hats
+beta.a <- solve(t(X.a) %*% X.a) %*% t(X.a) %*% y
+beta.b <- solve(t(X.b) %*% X.b) %*% t(X.b) %*% y
+
+# s.2.n is the estimated residual variance under the 
+# least squares estimate for model n
+s.2.a <- t(y - X.a %*% beta.a) %*% (y - X.a %*% beta.a) / (n - p.z.a)
+s.2.b <- t(y - X.b %*% beta.b) %*% (y - X.b %*% beta.b) / (n - p.z.b)
+
+# SSR for each model
+SSR.a <- t(y - X.a %*% beta.a) %*% (y - X.a %*% beta.a)
+SSR.b <- t(y - X.b %*% beta.b) %*% (y - X.b %*% beta.b)
+
+bayes.factor <- (1 + n) ^ ((p.z.b - p.z.a) / 2) * 
+    sqrt(s.2.a / s.2.b) * 
+    ((s.2.b + SSR.b) / (s.2.a + SSR.a)) ^ ((n + 1) / 2)
+
 # http://www.cs.berkeley.edu/~jordan/courses/260-spring10/lectures/lecture13.pdf
-p.gamma <- n - 2
-R.2.gamma <- 1 - t(y - X %*% beta.hat) %*% (y - X %*% beta.hat) / 
-             (t(y - mean(y)) %*% (y - mean(y)))
-
-b.f.n <- (1 + g) ^ ((n - 1 - p.gamma) / 2)
-b.f.d <- (1 + g * (1 - R.2.gamma)) ^ ((n - 1) / 2)
-bayes.factor <- b.f.n / b.f.d
+# p.gamma <- n - 2
+# R.2.gamma <- 1 - t(y - X %*% beta.hat) %*% (y - X %*% beta.hat) / 
+#              (t(y - mean(y)) %*% (y - mean(y)))
+# 
+# b.f.n <- (1 + g) ^ ((n - 1 - p.gamma) / 2)
+# b.f.d <- (1 + g * (1 - R.2.gamma)) ^ ((n - 1) / 2)
+# bayes.factor <- b.f.n / b.f.d
 ```
 
+We estimate the following densities for the $\beta$ coefficients using
+the $g$-prior.
+
+```{r p1d-plot}
+qplot(beta[, 1], xlab=expression(beta[0]))  
+qplot(beta[, 2], xlab=expression(beta[1]))
+```
+
+In these plots, we see that the posterior distribution for the baseline
+temperature is strongly below zero. Addtionally, we calculate a 
+bayes factor of `r bayes.factor`, indicating that the data
+favor the model with the baseline temperature over the null model quite
+strongly. Note that we used the **unit information prior** to calculate
+bayes factor.
+
 **2**
-Fit the regression model with interaction term to the FEV data. I prefer you use R directly and not jags.
 
 **a)**
-Using the posterior samples, estimate the posterior probability that the interaction term is positive and the posterior probability the interaction term is negative.
 ```{r p2a}
 ## NAIVE MODEL
 
@@ -240,13 +267,16 @@ for (s in 1:S) {
 interaction.model <- list(beta=beta.post, sigma.2=sigma.2.post)
 ```
 
+We used gibbs sampling to fit a linear model with an interaction term.
+We extended the prior multivariate mean to be (3, 0, 0, 0) and the prior
+multivariate variance covaraince matrix to be a diagonal matrix of
+5's.
+
 The posterior probability that the interaction term is negative is
 `r mean(interaction.model$beta[, 4] < 0)` and that it is postive is
 `r round(mean(interaction.model$beta[, 4] > 0), 2)`.
 
 **b)**
-Based on these posterior probability estimates for the interaction term, what is your conclusion about the evidence for an interaction?
-
 Based on the estimates from the posterior distribution, I conclude that 
 there exists an interaction between smoking and age, and that this
 interaction is negative. In other words, we expect for the gain in
