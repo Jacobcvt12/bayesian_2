@@ -128,6 +128,27 @@ for (s in 1:S) {
 }
 ```
 ```{r p1d-bf}
+# how much the data favor model z.a over z.b
+p.z.a <- 1
+p.z.b <- 2
+
+X.a <- X[, 1]
+X.b <- X
+
+# s.2.n is the estimated residual variance under the least squares estimate
+# for model n
+
+s.2.a <- 
+bayes.factor <- (1 + n) ^ (
+# review slides!
+# http://www.cs.berkeley.edu/~jordan/courses/260-spring10/lectures/lecture13.pdf
+p.gamma <- n - 2
+R.2.gamma <- 1 - t(y - X %*% beta.hat) %*% (y - X %*% beta.hat) / 
+             (t(y - mean(y)) %*% (y - mean(y)))
+
+b.f.n <- (1 + g) ^ ((n - 1 - p.gamma) / 2)
+b.f.d <- (1 + g * (1 - R.2.gamma)) ^ ((n - 1) / 2)
+bayes.factor <- b.f.n / b.f.d
 ```
 
 **2**
