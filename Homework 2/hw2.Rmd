@@ -280,7 +280,46 @@ The posterior probability that the interaction term is negative is
 Based on the estimates from the posterior distribution, I conclude that 
 there exists an interaction between smoking and age, and that this
 interaction is negative. In other words, we expect for the gain in
-FEV to be less by age for smokers.
+FEV to be less by age for smokers. Additionally, since the posterior 
+distribution is largely less than zero, there is a strong probability
+that the interaction term is not zero.
 
 **c)**
 Slide 24 of the Lecture05 file gives the analytic formula for the Bayes factor in nested normal regression models. Compute the Bayes factor that compares the model with interaction to the model with just the main effects but without the interaction. What is the evidence in favor of the interaction based on the Bayes factor?
+
+```{r p2c}
+X <- matrix(c(rep(1, length(age)), smoker, age), ncol=3)
+X.A <- matrix(c(rep(1, length(age)), smoker, age, smoker * age), ncol=4)
+
+V <- diag(5, 3)
+V.A <- diag(5, 4)
+
+V.star <- solve(solve(V) + t(X) %*% X)
+V.A.star <- solve(solve(V.A) + t(X.A) %*% X.A)
+
+m <- c(3, 0, 0)
+m.A <- c(3, 0, 0, 0)
+
+a <- 0.001 / 2
+b <- 0.001 / 2
+
+m.star <- V.star %*% (solve(V) %*% m + t(X) %*% y)
+m.A.star <- V.A.star %*% (solve(V.A) %*% m.A + t(X.A) %*% y)
+
+a.star <- a + t(m) %*% solve(V) %*% m + t(y) %*% y -
+          t(m.star) %*% solve(V.star) %*% m.star
+a.A.star <- a + t(m.A) %*% solve(V.A) %*% m.A + t(y) %*% y -
+            t(m.A.star) %*% solve(V.A.star) %*% m.A.star
+
+# don't have to calculate b.star, since same prior for b used
+
+bayes.factor <- sqrt(det(V)) / sqrt(det(V.A)) * 
+                sqrt(det(V.A.star)) * sqrt(det(V.star)) *
+                a.star / a.A.star
+```
+
+Using the analytic formula from lecture, we plug in the prior variance 
+covariance matrices for the main effects model and the interaction
+model. We calculate a bayes factor less than 0.001, indicating very
+strong evidence of the interaction model.
+
