@@ -7,7 +7,7 @@ output: pdf_document
 
 ```{r libraries, echo=FALSE}
 knitr::opts_chunk$set(cache=TRUE)
-knitr::opts_chunk$set(echo=FALSE)
+knitr::opts_chunk$set(echo=TRUE)
 knitr::opts_chunk$set(warning=FALSE)
 library(mvtnorm)
 library(ggplot2)
@@ -47,7 +47,6 @@ characterize the density. We use the following conditional posterior
 for sampling
 $\beta | y, \sigma^2 \sim N(\hat{\beta}, V_{\beta}\sigma^2$).
 ```{r p1b}
-# http://www.biostat.umn.edu/~brad/7440/Lecture5.pdf
 X <- matrix(c(rep(1, 12), x - mean(x)), ncol=2)
 y <- z
 
@@ -184,47 +183,6 @@ bayes factor.
 
 **a)**
 ```{r p2a}
-## NAIVE MODEL
-
-# prior parameters
-b.0 <- c(3, 0, 0)
-Sigma.0 <- diag(5, 3)
-nu.0 <- 1
-sigma.0.2 <- 1
-n <- length(fev)
-
-# organize data
-# X <- matrix(c(rep(1, length(age)), smoker, age, smoker * age), ncol=4)
-X <- matrix(c(rep(1, length(age)), smoker, age), ncol=3)
-y <- fev
-
-# Gibbs sampler
-S <- 5e3
-beta.post <- matrix(0, nrow=S, ncol=3)
-sigma.2.post <- numeric(S)
-
-# first guess for sigma.2
-sigma.2 <- 1 / rgamma(1, nu.0 / 2, nu.0 * sigma.0.2 / 2)
-
-for (s in 1:S) {
-    # update beta
-    V.b <- solve(solve(Sigma.0) + t(X) %*% X / sigma.2)
-    E.b <- V.b %*% (solve(Sigma.0) %*% b.0 + t(X) %*% y / sigma.2)
-    beta <- t(rmvnorm(1, E.b, V.b))
-
-    # update sigma.2
-    nu.n <- nu.0 + n
-    SSR <- sum((y - X %*% beta) ^ 2)
-    ss.n <- nu.0 * sigma.0.2 + SSR
-    sigma.2 <- 1 / rgamma(1, nu.n / 2, ss.n / 2)
-
-    # save results
-    beta.post[s, ] <- beta
-    sigma.2.post[s] <- sigma.2
-}
-
-naive.model <- list(beta=beta.post, sigma.2=sigma.2.post)
-
 ## INTERACTION MODEL
 
 # prior parameters
