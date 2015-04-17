@@ -1,0 +1,71 @@
+---
+title:   Homework 3
+author:  "Jacob Carey"
+date: "`r sys.Date`"
+output:pdf_document
+---
+
+```{r chunks, echo=FALSE}
+knitr::opts_chunk$set(echo=FALSE,
+                      cache=TRUE)
+```
+
+```{r libraries}
+library(dplyr)
+library(ggplot2)
+library(R2jags)
+```
+
+```{r data}
+N = 112
+
+# Year <- 1851:1962
+Year <- 1:N
+ 
+D <- c(4, 5, 4, 1, 0, 4, 
+       3, 4, 0, 6, 3, 3, 4, 0, 2, 6, 3, 3, 5, 4, 5, 3, 1, 4, 4, 1, 5, 
+       5, 3, 4, 2, 5, 2, 2, 3, 4, 2, 1, 3, 2, 1, 1, 1, 1, 1, 3, 0, 0, 
+       1, 0, 1, 1, 0, 0, 3, 1, 0, 3, 2, 2, 0, 1, 1, 1, 0, 1, 0, 1, 0, 
+       0, 0, 2, 1, 0, 0, 0, 1, 1, 0, 2, 2, 3, 1, 1, 2, 1, 1, 1, 1, 2, 
+       4, 2, 0, 0, 0, 1, 4, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 
+       0)
+```
+
+```{r model}
+coal.model <- function() {
+    for (i in 1:N) {
+        D[i] ~ dpois(ifelse(i > k, theta.2, theta.1))
+    }
+
+    k ~ dcat(Year)
+    phi <- theta.1 / theta.2
+    theta.1 ~ dgamma(a.1, b.1)
+    theta.2 ~ dgamma(a.2, b.2)
+    a.1 <- 0.5
+    a.2 <- 0.5
+    b.1 <- 1 / b.1.inv
+    b.2 <- 1 / b.2.inv
+    b.1.inv ~ dgamma(1, 1)
+    b.2.inv ~ dgamma(1, 1)
+}
+
+coal.data <- list("D", "Year", "N")
+coal.params <- c("theta.1", "theta.2", "phi", "k")
+coal.inits <- function() {
+    inits <- vector("list", 5)
+    names(inits) <- c("b.1.inv", "b.2.inv",
+                      "theta.1", "theta.2", "k")
+    inits$b.1.inv <- rgamma(1, 1, 1)
+    inits$b.2.inv <- rgamma(1, 1, 1)
+    inits$theta.1 <- rgamma(1, 1, 1 / inits$b.1.inv)
+    inits$theta.2 <- rgamma(1, 1, 1 / inits$b.2.inv)
+    inits$k <- sample(N, 1)
+    return(inits)
+}
+
+coal.fit <- jags(data=coal.data, inits=coal.inits,
+                 parameters.to.save=coal.params, 
+                 model.file=coal.model, n.chains=1,
+                 n.iter=5000)
+```
+
