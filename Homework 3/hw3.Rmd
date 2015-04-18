@@ -1,12 +1,12 @@
 ---
-title:   Homework 3
-author:  "Jacob Carey"
-date: "`r sys.Date`"
-output:pdf_document
+title:  Homework 3
+author: "[Jacob Carey](mailto:jcarey15@jhu.edu)"
+date:   "`r Sys.Date()`"
+output: pdf_document
 ---
 
 ```{r chunks, echo=FALSE}
-knitr::opts_chunk$set(echo=FALSE,
+knitr::opts_chunk$set(echo=TRUE,
                       cache=TRUE)
 ```
 
@@ -31,7 +31,7 @@ D <- c(4, 5, 4, 1, 0, 4,
        0)
 ```
 
-```{r model}
+```{r model1, results="hide"}
 coal.model <- function() {
     for (i in 1:N) {
         D[i] ~ dpois(ifelse(i > k, theta.2, theta.1))
@@ -65,7 +65,106 @@ coal.inits <- function() {
 
 coal.fit <- jags(data=coal.data, inits=coal.inits,
                  parameters.to.save=coal.params, 
-                 model.file=coal.model, n.chains=1,
-                 n.iter=5000)
+                 model.file=coal.model, n.chains=3,
+                 n.iter=2000)
 ```
 
+Problem 1a
+==========
+```{r a}
+k <- coal.fit$BUGSoutput$sims.matrix[, 2]
+phi <- coal.fit$BUGSoutput$sims.matrix[, 3]
+theta.1 <- coal.fit$BUGSoutput$sims.matrix[, 4]
+theta.2 <- coal.fit$BUGSoutput$sims.matrix[, 5]
+
+summ.stats <- function(X) {
+    c(mean(X), sd(X), quantile(X, c(0.05, 0.25, 0.5, 0.75, 0.95)))
+}
+
+tbl <- data.frame(theta.1=summ.stats(theta.1),
+                  theta.2=summ.stats(theta.2),
+                  phi=summ.stats(phi))
+
+rownames(tbl) <- c("mean", "standard deviation",
+                   "$5^{th}$", "$25^{th}$", "median",
+                   "$75^{th}$", "$95^{th}$")
+
+knitr::kable(tbl, col.names=c("$\\theta_1$", "$\\theta_2$", "$\\phi$"))
+
+qplot(theta.1, xlab=expression(theta[1]), ylab="")
+qplot(theta.2, xlab=expression(theta[2]), ylab="")
+qplot(phi, xlab=expression(phi), ylab="")
+```
+
+Problem 1b
+==========
+```{r b}
+qplot(k, xlab="k", ylab="")
+```
+
+From the samples from the marginal posterior distribution, the mean,
+standard deviation, 5th, 25th, 50th, 75th, and 95th percentile are
+`r summ.stats(k)`.
+
+Problem 1c
+==========
+```{r model2, results="hide"}
+coal.model <- function() {
+    for (i in 1:N) {
+        D[i] ~ dpois(ifelse(i > k, theta.2, theta.1))
+    }
+
+    k <- 50
+    phi <- theta.1 / theta.2
+    theta.1 ~ dgamma(a.1, b.1)
+    theta.2 ~ dgamma(a.2, b.2)
+    a.1 <- 0.5
+    a.2 <- 0.5
+    b.1 <- 1 / b.1.inv
+    b.2 <- 1 / b.2.inv
+    b.1.inv ~ dgamma(1, 1)
+    b.2.inv ~ dgamma(1, 1)
+}
+
+coal.data <- list("D", "N")
+coal.params <- c("theta.1", "theta.2", "phi")
+coal.inits <- function() {
+    inits <- vector("list", 4)
+    names(inits) <- c("b.1.inv", "b.2.inv",
+                      "theta.1", "theta.2")
+    inits$b.1.inv <- rgamma(1, 1, 1)
+    inits$b.2.inv <- rgamma(1, 1, 1)
+    inits$theta.1 <- rgamma(1, 1, 1 / inits$b.1.inv)
+    inits$theta.2 <- rgamma(1, 1, 1 / inits$b.2.inv)
+    return(inits)
+}
+
+coal.fit <- jags(data=coal.data, inits=coal.inits,
+                 parameters.to.save=coal.params, 
+                 model.file=coal.model, n.chains=3,
+                 n.iter=2000)
+```
+
+```{r c}
+phi <- coal.fit$BUGSoutput$sims.matrix[, 2]
+theta.1 <- coal.fit$BUGSoutput$sims.matrix[, 3]
+theta.2 <- coal.fit$BUGSoutput$sims.matrix[, 4]
+
+tbl <- data.frame(theta.1=summ.stats(theta.1),
+                  theta.2=summ.stats(theta.2),
+                  phi=summ.stats(phi))
+
+rownames(tbl) <- c("mean", "standard deviation",
+                   "$5^{th}$", "$25^{th}$", "median",
+                   "$75^{th}$", "$95^{th}$")
+
+knitr::kable(tbl, col.names=c("$\\theta_1$", "$\\theta_2$", "$\\phi$"))
+
+qplot(theta.1, xlab=expression(theta[1]), ylab="")
+qplot(theta.2, xlab=expression(theta[2]), ylab="")
+qplot(phi, xlab=expression(phi), ylab="")
+```
+
+After learning that $k=50$, the posterior estimates of $\theta_1$ and 
+$\phi$ decrease. However, the posterior estimate of $\theta_2$ is about
+the same.
