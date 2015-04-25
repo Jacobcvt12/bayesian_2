@@ -1,0 +1,34 @@
+---
+title:  Homework 4
+author: "[Jacob Carey](mailto:jcarey15@jhu.edu)"
+date:   "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r chunks, echo=FALSE}
+knitr::opts_chunk$set(echo=FALSE,
+                      cache=FALSE)
+```
+
+```{r libraries}
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(R2jags)
+```
+
+```{r data}
+fungus <- read_delim("./ToenailFungusData.txt", delim=" ")
+```
+
+# Problem 1
+Write out a full model (sampling distribution and priors) to characterize these repeated binary data, using a logit link function. Assume that the only subject-apecific parameter is the intercept term. (Note: Since this is a randomized study, the average score for patients on each treatment should be the same at week 0. Therefore, if there is a treatment effect, the treatment-specific slopes of the scores over time will differ.)
+
+# Problem 2
+Fit the model and summarize the results. What do you conclude about the treatment effect?
+
+# Problem 3
+Now write out a full Bayesian hierarchical model, allowing each patient to have his or her own regression coefficients.
+
+# Problem 4
+Fit the full hierarchical model and summarize the results. Has your inference about the relative effectiveness of the treatments changed?
