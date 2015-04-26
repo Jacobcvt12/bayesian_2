@@ -6,26 +6,73 @@ output: pdf_document
 ---
 
 ```{r chunks, echo=FALSE}
-knitr::opts_chunk$set(echo=FALSE,
+knitr::opts_chunk$set(echo=TRUE,
                       cache=FALSE)
 ```
 
 ```{r libraries}
 library(dplyr)
+library(tidyr)
 library(readr)
 library(ggplot2)
 library(R2jags)
 ```
 
 ```{r data}
-fungus <- read_delim("./ToenailFungusData.txt", delim=" ")
+fungus <- read_delim("./ToenailFungusData.txt", delim=" ") %>%
+    # reallocate visit number
+    group_by(ID) %>%
+    mutate(Visit=1:n())
+
+y <- fungus %>% select(ID, Visit, y) %>% spread(Visit, y) %>% select(-ID)
+treatment <- fungus %>% distinct(ID, Trt) %>% select(ID, Trt) %>% .$Trt
+time <- fungus %>% select(ID, Visit, Time) %>% spread(Visit, Time)
+n.visits <- fungus %>% count(ID) %>% .$n
+n.people <- length(n.visits)
 ```
 
 # Problem 1
 Write out a full model (sampling distribution and priors) to characterize these repeated binary data, using a logit link function. Assume that the only subject-apecific parameter is the intercept term. (Note: Since this is a randomized study, the average score for patients on each treatment should be the same at week 0. Therefore, if there is a treatment effect, the treatment-specific slopes of the scores over time will differ.)
 
+$$
+\begin{aligned}
+y_{i,j} | x_i, t_{i, j}, \alpha_{i, j}, \beta_1, \beta_2 \sim \text{binomial}(\mu_{i, j}) \\
+\text{logit}(\mu_{i, j}) = \alpha_{i, j} + \beta_1 x_i + \beta_2 t_{i, j} \\
+\beta_1, \beta_2 \sim \text{Normal}(0, 1000)
+\end{aligned}
+$$
+
 # Problem 2
 Fit the model and summarize the results. What do you conclude about the treatment effect?
+```{r p2, eval=FALSE}
+fungus.model <- function() {
+    for (i in 1:n.people) {
+        for (j in 1:n.visits[i]) {
+            y[i, j] ~ dbern(mu[i, j])
+            logit(mu[i, j]) <- alpha[i] + beta1 * treatment[i] +
+                               beta2 * time[i, j]
+        }
+
+        alpha[i] ~ dnorm(0.0, 1.0e-04) # random intercept
+    }
+
+    beta1 ~ dnorm(0.0, 1.0e-04) # treatment
+    beta2 ~ dnorm(0.0, 1.0e-04) # time
+}
+
+fungus.data <- list("y", "treatment", "time",
+                    "n.people", "n.visits")
+fungus.params <- c("alpha", "beta1", "beta2", "mu")
+fungus.inits <- function() {
+    list("beta1"=rnorm(1, 0, 1e-4),
+         "beta2"=rnorm(1, 0, 1e-4))
+}
+
+fungus.fit <- jags(data=fungus.data, inits=fungus.inits,
+                   parameters.to.save=fungus.params,
+                   model.file=fungus.model, n.chains=3,
+                   n.iter=2000)
+```
 
 # Problem 3
 Now write out a full Bayesian hierarchical model, allowing each patient to have his or her own regression coefficients.
