@@ -7,7 +7,8 @@ output: pdf_document
 
 ```{r chunks, echo=FALSE}
 knitr::opts_chunk$set(echo=TRUE,
-                      cache=FALSE)
+                      cache=FALSE,
+                      results='asis')
 ```
 
 ```{r libraries}
@@ -16,6 +17,7 @@ library(tidyr)
 library(readr)
 library(ggplot2)
 library(R2jags)
+theme_set(theme_classic())
 ```
 
 ```{r data}
@@ -26,7 +28,8 @@ fungus <- read_delim("./ToenailFungusData.txt", delim=" ") %>%
 
 y <- fungus %>% select(ID, Visit, y) %>% spread(Visit, y) %>% select(-ID)
 treatment <- fungus %>% distinct(ID, Trt) %>% select(ID, Trt) %>% .$Trt
-time <- fungus %>% select(ID, Visit, Time) %>% spread(Visit, Time)
+time <- fungus %>% select(ID, Visit, Time) %>% spread(Visit, Time) %>%
+    select(-ID)
 n.visits <- fungus %>% count(ID) %>% .$n
 n.people <- length(n.visits)
 ```
@@ -36,46 +39,154 @@ Write out a full model (sampling distribution and priors) to characterize these 
 
 $$
 \begin{aligned}
-y_{i,j} | x_i, t_{i, j}, \alpha_{i, j}, \beta_1, \beta_2 \sim \text{binomial}(\mu_{i, j}) \\
-\text{logit}(\mu_{i, j}) = \alpha_{i, j} + \beta_1 x_i + \beta_2 t_{i, j} \\
-\beta_1, \beta_2 \sim \text{Normal}(0, 1000)
+y_{i,j} | x_i, t_{i, j}, \alpha, \alpha_{i}, 
+\beta_1, \beta_2, \beta_3 \sim 
+\text{bernoulli}(\mu_{i, j}) \\
+\text{logit}(\mu_{i, j}) = \alpha + \alpha_{i} + 
+\beta_1 x_i + \beta_2 t_{i, j} + \beta_3 x_i t_{i, j} \\
+\alpha, \beta_1, \beta_2 \beta_3, \sim \text{Normal}(0, 1000) \\
+\alpha_{i} \sim \text{Normal}(\mu_{\alpha}, \omega_{\alpha}^2) \\
+\omega_{\alpha}^2 \sim \text{Unif(0, 100)}
 \end{aligned}
 $$
 
 # Problem 2
 Fit the model and summarize the results. What do you conclude about the treatment effect?
-```{r p2, eval=FALSE}
+
+```{r p2}
 fungus.model <- function() {
     for (i in 1:n.people) {
         for (j in 1:n.visits[i]) {
             y[i, j] ~ dbern(mu[i, j])
-            logit(mu[i, j]) <- alpha[i] + beta1 * treatment[i] +
-                               beta2 * time[i, j]
+            logit(mu[i, j]) <- alpha.fixed + alpha[i] + 
+                               (b1.fixed) * treatment[i] +
+                               (b2.fixed) * time[i, j] +
+                               (b3.fixed) * treatment[i] * time[i, j]
         }
 
-        alpha[i] ~ dnorm(0.0, 1.0e-04) # random intercept
+        alpha[i] ~ dnorm(0.0, omega.a.inv) # random intercept
     }
 
-    beta1 ~ dnorm(0.0, 1.0e-04) # treatment
-    beta2 ~ dnorm(0.0, 1.0e-04) # time
+    alpha.fixed ~ dnorm(0.0, 1.0e-04) # fixed intercept
+    b1.fixed ~ dnorm(0.0, 1.0e-04) # fixed treatment coef
+    b2.fixed ~ dnorm(0.0, 1.0e-04) # fixed time coef
+    b3.fixed ~ dnorm(0.0, 1.0e-04) # fixed interaction coef
+    omega.a.inv <- 1 / omega.a
+    omega.a ~ dunif(0, 10) # between group variance
 }
 
 fungus.data <- list("y", "treatment", "time",
                     "n.people", "n.visits")
-fungus.params <- c("alpha", "beta1", "beta2", "mu")
+fungus.params <- c("alpha.fixed", "omega.a", 
+                   "b1.fixed", "b2.fixed", 
+                   "b3.fixed")
 fungus.inits <- function() {
-    list("beta1"=rnorm(1, 0, 1e-4),
-         "beta2"=rnorm(1, 0, 1e-4))
+    list("alpha.fixed"=rnorm(1, 0, 1),
+         "omega.a"=runif(1, 0, 1),
+         "b1.fixed"=rnorm(1, 0, 1),
+         "b2.fixed"=rnorm(1, 0, 1),
+         "b3.fixed"=rnorm(1, 0, 1))
 }
 
 fungus.fit <- jags(data=fungus.data, inits=fungus.inits,
                    parameters.to.save=fungus.params,
-                   model.file=fungus.model, n.chains=3,
-                   n.iter=2000)
+                   model.file=fungus.model, n.chains=3, progress.bar="none",
+                   n.iter=5e3)
+
+output <- fungus.fit$BUGSoutput$summary
+rownames(output) <- c("$\\alpha$", "$\\beta_1$", "$\\beta_2$", "$\\beta_3$",
+                      "deviance", "$\\omega_{\\alpha}^2$")
+knitr::kable(output, digits=3)
 ```
+
+
+I conclude that the treatment is effective. Using this hierarchical model, the effectiveness of treatment seems small.
 
 # Problem 3
 Now write out a full Bayesian hierarchical model, allowing each patient to have his or her own regression coefficients.
 
+$$
+\begin{aligned}
+y_{i,j} | x_i, t_{i, j}, \alpha, \alpha_{i}, 
+\beta_1, \beta_2, \beta_3,
+\beta_{1_i}, \beta_{2_i}, \beta_{3_i} \sim 
+\text{bernoulli}(\mu_{i, j}) \\
+\text{logit}(\mu_{i, j}) = (\alpha + \alpha_{i}) + 
+(\beta_1 + \beta_{1_i}) x_i + 
+(\beta_2 + \beta_{2_i}) t_{i, j} + 
+(\beta_3 + \beta_{3_i}) x_i t_{i, j} \\
+\alpha, \beta_1, \beta_2, \beta_3, \sim \text{Normal}(0, 1000) \\
+\alpha_{i} \sim \text{Normal}(\mu_{\alpha}, \omega_{\alpha}^2) \\
+\beta_{1_i} \sim \text{Normal}(\mu_{\beta_1}, \omega_{\beta_1}^2) \\
+\beta_{2_i} \sim \text{Normal}(\mu_{\beta_2}, \omega_{\beta_2}^2) \\
+\beta_{3_i} \sim \text{Normal}(\mu_{\beta_3}, \omega_{\beta_3}^2) \\
+\omega_{\alpha}^2 \sim \text{Unif(0, 100)}
+\end{aligned}
+$$
+
 # Problem 4
 Fit the full hierarchical model and summarize the results. Has your inference about the relative effectiveness of the treatments changed?
+
+```{r p4}
+fungus.model <- function() {
+    for (i in 1:n.people) {
+        for (j in 1:n.visits[i]) {
+            y[i, j] ~ dbern(mu[i, j])
+            logit(mu[i, j]) <- alpha.fixed + alpha[i] + 
+                               (b1.fixed + b1[i]) * treatment[i] +
+                               (b2.fixed + b2[i]) * time[i, j] +
+                               (b3.fixed + b3[i]) * treatment[i] * time[i, j]
+        }
+
+        alpha[i] ~ dnorm(0.0, omega.a.inv) # random intercept
+        b1[i] ~ dnorm(0.0, omega.b1.inv) # random treatment
+        b2[i] ~ dnorm(0.0, omega.b2.inv) # random time
+        b3[i] ~ dnorm(0.0, omega.b3.inv) # random interaction
+    }
+
+    alpha.fixed ~ dnorm(0.0, 1.0e-04) # fixed intercept
+    b1.fixed ~ dnorm(0.0, 1.0e-04) # fixed treatment coef
+    b2.fixed ~ dnorm(0.0, 1.0e-04) # fixed time coef
+    b3.fixed ~ dnorm(0.0, 1.0e-04) # fixed interaction coef
+    omega.a.inv <- 1 / omega.a
+    omega.b1.inv <- 1 / omega.b1
+    omega.b2.inv <- 1 / omega.b2
+    omega.b3.inv <- 1 / omega.b3
+    omega.a ~ dunif(0, 10) # between group variance
+    omega.b1 ~ dunif(0, 10) # between group variance
+    omega.b2 ~ dunif(0, 10) # between group variance
+    omega.b3 ~ dunif(0, 10) # between group variance
+}
+
+fungus.data <- list("y", "treatment", "time",
+                    "n.people", "n.visits")
+fungus.params <- c("alpha.fixed", "omega.a", 
+                   "omega.b1", "omega.b2", "omega.b3",
+                   "b1.fixed", "b2.fixed", 
+                   "b3.fixed")
+fungus.inits <- function() {
+    list("alpha.fixed"=rnorm(1, 0, 1),
+         "omega.a"=runif(1, 0, 1),
+         "omega.b1"=runif(1, 0, 1),
+         "omega.b2"=runif(1, 0, 1),
+         "omega.b3"=runif(1, 0, 1),
+         "b1.fixed"=rnorm(1, 0, 1),
+         "b2.fixed"=rnorm(1, 0, 1),
+         "b3.fixed"=rnorm(1, 0, 1))
+}
+
+fungus.fit <- jags(data=fungus.data, inits=fungus.inits,
+                   parameters.to.save=fungus.params,
+                   model.file=fungus.model, n.chains=3, progress.bar="none",
+                   n.iter=5e4, n.burnin=5e3)
+
+output <- fungus.fit$BUGSoutput$summary
+rownames(output) <- c("$\\alpha$", "$\\beta_1$", "$\\beta_2$", "$\\beta_3$",
+                      "deviance", "$\\omega_{\\alpha}^2$", 
+                      "$\\omega_{\\beta_1}^2$", "$\\omega_{\\beta_2}^2$",
+                      "$\\omega_{\\beta_3}^2$")
+knitr::kable(output, digits=3)
+```
+
+
+My inference about the direction of effectiveness is still the same. However, when fitting a full hierarchical model, the population level effect of treatment is stronger - there is a larger protective effect of the treatment.
