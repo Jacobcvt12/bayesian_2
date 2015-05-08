@@ -1,0 +1,91 @@
+---
+title: "Dynamic Linear Models and Cholera in the DRC"
+author: "Jacob Carey"
+date: "May 14, 2015"
+bibliography: references.bib
+output: 
+  beamer_presentation:
+    theme: "Szeged"
+    toc: true
+---
+
+```{r chunks, echo=FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+```{r libs}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lubridate)
+theme_set(theme_classic())
+```
+
+```{r data}
+source("~/Code/Dynamics/cholera/scripts/read-in.R")
+input.dir <- "~/Code/Dynamics/epicentrehopkins/trunk/Data/DRC/kalemie"
+data <- read.in(input.dir) %>%
+    tbl_df() %>%
+    filter(!AS %in% c("", "Out of Area", "MAHILA"),
+           !is.na(Date),
+           year(Date) > 2008)
+```
+
+# Background {-}
+
+- Cholera is endemic in the DRC
+- Vaccine exists
+- Vaccine Campaign conducted by MSF
+
+# Overview
+```{r}
+ggplot(data, aes(x=factor(year))) +
+    geom_histogram() +
+    xlab("Year") +
+    ylab("Cholera Cases")
+```
+
+# Overview
+```{r}
+graph.data <- data %>%
+    group_by(region=AS, quarter=quarter(Date, with_year=TRUE)) %>%
+    summarise(cases=n()) %>%
+    mutate(quarter.dec=(quarter - floor(quarter) - 0.1) * 2.5,
+           quarter=floor(quarter) + quarter.dec) %>%
+    select(-quarter.dec)
+
+ggplot(graph.data, aes(x=quarter, y=cases)) +
+    geom_point(aes(colour=region)) +
+    geom_smooth(aes(colour=region), se=FALSE) +
+    xlab("Quarter") +
+    ylab("Cholera Cases")
+```
+
+# Dynamic Linear Models
+
+- Special case of State Space Models.
+
+- Described in @dlm.
+
+# Methods
+
+- Fit DLM to data
+
+# Results
+
+- More graphs
+
+# Discussion
+
+- Vaccine resulted in 20% fewer cases in vaccinated regions
+
+# Future work
+
+- Nonparametric Bayesian statistics
+
+# References
+
+---
+
+## Questions?
+
