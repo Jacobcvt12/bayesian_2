@@ -1,0 +1,96 @@
+---
+title: "Homework 5"
+date: "May 12, 2015"
+author: "Jacob Carey"
+output: pdf_document
+---
+
+```{r libs, echo=FALSE}
+library(dplyr)
+library(tidyr)
+library(mvtnorm)
+```
+
+```{r data, echo=FALSE}
+# read in data
+source('./Pain.txt')
+
+# transform data
+drugs <- Pain %>%
+    data.frame(.) %>%
+    mutate(drug=rownames(.)) %>%
+    tbl_df() %>%
+    gather(outcome, count, Poor:VG.Exc.)
+
+# turn counts into repeated obs
+idx <- rep.int(1:nrow(drugs), drugs$count)
+drugs <- drugs[idx, ] %>%
+    select(-count)
+```
+
+In this problem, we will compare four drugs for treating pain. These data were analyzed by Chuang and Agresti (1986, _Stat Med_ **5**:15-20).  
+
+The researchers collected responses on pain severity in a clinical study in which patients received a single dose of an analgesic postoperatively. The four drugs in the study were Z100, EC4, C60, and C15. The outcomes were an ordered scale with four ratings, namely, poor, fair, good, and very good to excellent. (The authors combined patients in the two best categories into one category (”very good to excellent”), because of small numbers.) The study was not randomized, but we will assume that there are no systematic differences in the patient characteristics across the groups of patients receiving each of the four drugs. The following table shows the data.  
+
+```{r table, echo=FALSE}
+knitr::kable(Pain, caption="Pain scores in clinical study of four drugs.")
+```
+
+We will compare the four drugs using an ordinal regression model. The data are at the Course- Plus site in a file named “Pain.txt.” The outcome is the pain score (one of the four ordered categories), and the covariate is the drug. The data are the total number of patients receiving each drug who assigned each score to their pain. You will find it convenient to convert the data into individual observations when fitting the model. For example, five patients scored their pain as ”Poor” after receiving Z100. You can turn this into 5 separate observations with the outcome a score ”Poor” and the drug ”Z100.”
+
+1. Write out a full model (sampling distribution and priors) to characterize these outcomes, using a latent-variable model with a probit link.  
+
+$$
+\begin{aligned}
+\epsilon_1, ..., \epsilon_n \sim \text{i.i.d. normal}(0, 1) \\
+\beta \sim \text{multivariate normal}(\mathbf{0}, n(\mathbf{X}^T\mathbf{X})^{-1}) \\
+Z_i = \beta^T \text{drug}_i + \epsilon_i \\
+Y_i = g(Z_i) \\
+\end{aligned}
+$$
+
+$$
+\begin{aligned}
+y = g(z) &= \text{Poor if } -\infty = g_0 < z < g_1 \\
+&= \text{Fair if } g_1 < z < g_2 \\
+&= \text{Good if } g_2 < z < g_3 \\
+&= \text{Very good to excellent if } g_3 < z < g_4 = \infty
+\end{aligned}
+$$
+
+2. Fit the model. You will probably find it easier to use R, since we have not yet covered the way to handle the categories in JAGS. The necessary pieces of the code in R are in chapter 12 of the textbook, as well as some pieces in earlier chapters (e.g., normal regression).  
+
+```{r p2}
+# set seed
+set.seed(42)
+
+# data
+y <- as.numeric(drugs$outcome)
+X <- model.matrix(~drugs$drug)
+
+# priors
+n <- length(y)
+b.prior <- rmvnorm(1, sigma=n * solve(t(X) %*% X))
+
+# sampling parameters
+S <- 5e3
+
+# distribution parameters
+
+for (s in 1:S) {
+    for (i in 1:n) {
+        ez <- t(beta) %*% X[i, ]
+        a <- max(-Inf, g[y[i] - 1], na.rm=TRUE)
+        b <- min(g[y[i]], Inf, na.rm=TRUE)
+
+        u <- runif(1, pnorm(a - ez), pnorm(b - ez))
+        z[i] <- ez + qnorm(u)
+    }
+
+    beta
+}
+```
+
+3. Summarize the results. What do you conclude about the effectiveness of the treatments?
+
+I conclude that EC4 is the most effective, with Z100, C60, and C15 following.
