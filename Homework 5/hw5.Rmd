@@ -9,6 +9,7 @@ output: pdf_document
 library(dplyr)
 library(tidyr)
 library(mvtnorm)
+library(coda)
 ```
 
 ```{r data, echo=FALSE}
@@ -66,20 +67,30 @@ set.seed(42)
 
 # data
 y <- as.numeric(drugs$outcome)
-X <- model.matrix(~drugs$drug)
-
-# priors
-n <- length(y)
-b.prior <- rmvnorm(1, sigma=n * solve(t(X) %*% X))
+X <- model.matrix(~drugs$drug - 1)
 
 # sampling parameters
 S <- 5e3
+burn.in <- 1e3
 
-# distribution parameters
+# allocated space
+beta.post <- matrix(0, nrow=S, ncol=ncol(X))
 
-for (s in 1:S) {
+# priors
+n <- length(y)
+beta.post[1, ] <- rmvnorm(1, sigma=n * solve(t(X) %*% X))
+mu <- rep(0, 3)
+sigma <- rep(1e4, 3)
+
+g <- c(-1, 0, 1)
+z <- numeric(n)
+
+for (s in 2:S) {
+#     if (!s %% 100) cat(s, "\n")
+
     for (i in 1:n) {
-        ez <- t(beta) %*% X[i, ]
+        # full conditional of z
+        ez <- t(beta.post[s - 1, ]) %*% X[i, ]
         a <- max(-Inf, g[y[i] - 1], na.rm=TRUE)
         b <- min(g[y[i]], Inf, na.rm=TRUE)
 
@@ -87,10 +98,34 @@ for (s in 1:S) {
         z[i] <- ez + qnorm(u)
     }
 
-    beta
+    # full condtional of beta
+    vb <- n / (n + 1) * solve(t(X) %*% X)
+    eb <- vb %*% t(X) %*% z
+    beta.post[s, ] <- rmvnorm(1, eb, vb)
+
+    # full conditional of g
+    for (k in 1:(ncol(X) - 3)) {
+        a <- max(z[y == k])
+        b <- min(z[y == k + 1])
+
+        u <- runif(1, pnorm((a - mu[k]) / sigma[k]),
+                   pnorm((b - mu[k]) / sigma[k]))
+        g[k] <- mu[k] + sigma[k] * qnorm(u)
+    }
 }
+
+# drop first 1e3 results
+beta.post <- beta.post[-1:-burn.in, ]
+
+# add col names
+colnames(beta.post) <- unique(drugs$drug)
+
+# summary
+beta.post <- as.mcmc(beta.post)
+knitr::kable(summary(beta.post)$quantiles)
 ```
 
 3. Summarize the results. What do you conclude about the effectiveness of the treatments?
 
-I conclude that EC4 is the most effective, with Z100, C60, and C15 following.
+I conclude that C60 is the most effective of the drugs, followed by C15.
+EC4 and Z100 do not seem to have a significant effect.
