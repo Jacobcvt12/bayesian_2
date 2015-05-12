@@ -189,6 +189,8 @@ ggplot(data.model, aes(x=x, y=obs)) +
 - Weather likely plays a role in this data
     - Next step would likely include collecting weather data to use in a 
       DLM regression.
+- Forecasting more than one step ahead may be useful, but credible intervals
+  get very wide.
 
 ## Questions?
 
