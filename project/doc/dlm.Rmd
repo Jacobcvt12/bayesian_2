@@ -3,10 +3,12 @@ title: "Dynamic Linear Models and Cholera in the DRC"
 author: "Jacob Carey"
 date: "May 14, 2015"
 bibliography: references.bib
+header-includes:
+   - \usepackage{tikzsymbols}
 output: 
   beamer_presentation:
     theme: "Szeged"
-    toc: true
+    slide_level: 2
 ---
 
 ```{r chunks, echo=FALSE}
@@ -14,11 +16,17 @@ knitr::opts_chunk$set(echo=FALSE)
 ```
 
 ```{r libs}
+library(dlm)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(lubridate)
 theme_set(theme_classic())
+```
+
+```{r funcs}
+source("./../R/dlmFilterDF.R")
+source("./../R/model.R")
 ```
 
 ```{r data}
@@ -28,16 +36,36 @@ data <- read.in(input.dir) %>%
     tbl_df() %>%
     filter(!AS %in% c("", "Out of Area", "MAHILA"),
            !is.na(Date),
-           year(Date) > 2008)
+           year(Date) > 2009)
+
+cases <- data %>%
+    group_by(date=round_date(Date, unit="week")) %>%
+    summarise(cases=n())
 ```
 
-# Background {-}
+# Background
+## Cholera
+
+- Infectious disease presenting with diarrhea
+- Often spread through contaminated water
+- Treatment is simple
+- But vaccine exists (not licensed in US)  
+  
+@cholera
+
+## My problem
 
 - Cholera is endemic in the DRC
-- Vaccine exists
 - Vaccine Campaign conducted by MSF
+- Hard to implement campain
 
-# Overview
+## Question
+
+- Vaccine campaign was only conducted in some of the areas
+- Was the campaign effective? If so, how effective was it?
+
+# Summary of data
+## Cholera Cases by Year
 ```{r}
 ggplot(data, aes(x=factor(year))) +
     geom_histogram() +
@@ -45,7 +73,7 @@ ggplot(data, aes(x=factor(year))) +
     ylab("Cholera Cases")
 ```
 
-# Overview
+## Cholera by Region and Time
 ```{r}
 graph.data <- data %>%
     group_by(region=AS, quarter=quarter(Date, with_year=TRUE)) %>%
@@ -61,31 +89,108 @@ ggplot(graph.data, aes(x=quarter, y=cases)) +
     ylab("Cholera Cases")
 ```
 
-# Dynamic Linear Models
+## Univariate Time Series for Analysis
+```{r}
+ggplot(cases, aes(x=date, y=cases)) +
+    geom_line() +
+    geom_point()
+```
 
+# Analytical Considerations
+## Challenges
+
+- Temporal trend
+    - Assumption of equal variance doesn't hold
+- Infectious disease
+    - Assumption of independence doesn't hold
+
+## Can These Work?
+
+- GLM
+    - Not all assumptions hold
+- Changepoint analysis
+    - Doesn't account for temporal/seasonal trends
+
+## Dynamic Linear Models?
+
+- Dynamic Linear Models
 - Special case of State Space Models.
-
 - Described in @dlm.
 
-# Methods
+# Dynamic Linear Models
+## Formulation of Time Series
 
-- Fit DLM to data
+- Time series formulation
+- $\theta_t = \theta_{t-1} + \nu + w_t$
+    - $w_t \sim \text{Normal}(0, \sigma_w^2)$  
+- $Y_t = \theta_t + \epsilon_t$
+    - $\epsilon_t \sim \text{Normal}(0, \sigma^2)$
 
-# Results
+## Formulation of Dynamic Linear Models
 
-- More graphs
+- Dynamic Linear Models specification
+- $\theta_{t=0} \sim \text{Normal}(m_0, C_0)$
+- $Y_t = F_t \theta_t + v_t$
+    - $v_t \sim \text{Normal}(0, V_t)$
+- $\theta_t = G_t \theta_{t-1} + w_t$
+    - $w_t \sim \text{Normal}(0, W_t)$
 
-# Discussion
+## What about Bayes?
 
-- Vaccine resulted in 20% fewer cases in vaccinated regions
+- Those unknowns are intimidating...
+- MLE can be used, but often times many local maxima
+- Sometimes a relatively flat likelihood
+- Let's use Bayesian estimation instead
 
-# Future work
+## Some Notes about DLMs
 
-- Nonparametric Bayesian statistics
+- Naturally extends to multivariate time series
+    - Covariance between regional cases makes spatial sense
+- Online forecasting
+    - Not really relevant to my problem but an interesting 
+      finding.
+- While I did not consider this, DLMs can also be used in combination with
+  regression.
 
-# References
+# Findings
+## Results
 
----
+```{r results, warning=FALSE}
+y <- cases$cases
+dates <- cases$date
+data.model <- data.frame(dlm.model(y, order=1)) %>%
+    mutate(x=dates)
+
+data.model <- data.model[10:nrow(data.model), ]
+
+ggplot(data.model, aes(x=x, y=obs)) +
+    geom_point() +
+    geom_ribbon(aes(ymin=ll, ymax=ul),
+                alpha=0.25, colour="blue") +
+    xlab("Date") + 
+    ylab("Cases") +
+    ggtitle("One-ahead Forecast")
+```
+
+## Discussion
+
+- Did not see evidence of vaccine effectiveness $\Sadey$
+- This could likely be due to level of detail lost in aggregating regions
+- More work needed to clarify this point
+    - Possible that there was no overall change in incidence of Cholera
+    - Concerning! $\NiceReapey$
+
+## Future work
+
+- Multivariate case
+    - I've structured the data as a univariate time series for simplification
+    - There's definitely covariance between regions that needs to be accounted
+      for
+- Weather likely plays a role in this data
+    - Next step would likely include collecting weather data to use in a 
+      DLM regression.
 
 ## Questions?
+
+## References
 
