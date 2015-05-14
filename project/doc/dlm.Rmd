@@ -48,7 +48,8 @@ cases <- data %>%
 
 - Infectious disease presenting with diarrhea
 - Often spread through contaminated water
-- Treatment is simple
+- Treatment is simple and cheap
+    - Though time consuming
 - But vaccine exists (not licensed in US)  
   
 @cholera
@@ -57,7 +58,7 @@ cases <- data %>%
 
 - Cholera is endemic in the DRC
 - Vaccine Campaign conducted by MSF
-- Hard to implement campain
+- Hard to implement campaign
 
 ## Question
 
@@ -149,16 +150,16 @@ ggplot(cases, aes(x=date, y=cases)) +
 - Online forecasting
     - Not really relevant to my problem but an interesting 
       finding.
-- While I did not consider this, DLMs can also be used in combination with
-  regression.
+- DLMs can also be used in combination with regression.
+    - Not considered here
 
 # Findings
 ## Results
 
 ```{r results, warning=FALSE}
-y <- cases$cases
+y <- ts(cases$cases, freq=52)
 dates <- cases$date
-data.model <- data.frame(dlm.model(y, order=1)) %>%
+data.model <- data.frame(dlm.model(y, order=4)) %>%
     mutate(x=dates)
 
 data.model <- data.model[10:nrow(data.model), ]
@@ -187,12 +188,13 @@ ggplot(data.model, aes(x=x, y=obs)) +
     - There's definitely covariance between regions that needs to be accounted
       for
 - Weather likely plays a role in this data
-    - Next step would likely include collecting weather data to use in a 
+    - Next steps should include collecting weather data to use in a 
       DLM regression.
-- Forecasting more than one step ahead may be useful, but credible intervals
-  get very wide.
 
-## Questions?
+---
+
+> - Questions?
+> - Or should we just call it summer?
 
 ## References
 
